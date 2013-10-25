@@ -90,7 +90,7 @@ QIcon qSlicerRTThermometryModule::icon()const
 //-----------------------------------------------------------------------------
 QStringList qSlicerRTThermometryModule::categories() const
 {
-  return QStringList() << "Examples";
+  return QStringList() << "IGT";
 }
 
 //-----------------------------------------------------------------------------

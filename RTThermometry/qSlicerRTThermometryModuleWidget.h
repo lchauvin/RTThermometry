@@ -18,12 +18,16 @@
 #ifndef __qSlicerRTThermometryModuleWidget_h
 #define __qSlicerRTThermometryModuleWidget_h
 
+#include "vtkIGTLToMRMLImage.h"
+#include "vtkImageData.h"
+#include "vtkMatrix4x4.h"
 #include "vtkMRMLIGTLConnectorNode.h"
 #include "vtkMRMLInteractionNode.h"
 #include "vtkMRMLMarkupsDisplayNode.h"
 #include "vtkMRMLMarkupsFiducialNode.h"
 #include "vtkMRMLScalarVolumeNode.h"
 #include "vtkMRMLSelectionNode.h"
+#include "vtkPointData.h"
 
 // SlicerQt includes
 #include "qSlicerAbstractModuleWidget.h"
@@ -57,6 +61,7 @@ public slots:
   void onMarkupNodeModified(vtkObject* vtkNotUsed(caller), vtkObject* callData);
   void onMarkupNodeRemoved();
   void onSensorChanged(int row, int column);
+  void onPhaseImageModified();
 
 protected:
   QScopedPointer<qSlicerRTThermometryModuleWidgetPrivate> d_ptr;
@@ -64,6 +69,11 @@ protected:
   virtual void setup();
   void updateMarkupInWidget(Markup* modifiedMarkup);
   int getMarkupIndexByID(const char* markupID);
+  void computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, 
+			      vtkMRMLScalarVolumeNode* secondNode);
+  void newImageAdded();
+  void updateAllMarkups();
+  void saveMarkupsValues();
 
 private:
   Q_DECLARE_PRIVATE(qSlicerRTThermometryModuleWidget);
