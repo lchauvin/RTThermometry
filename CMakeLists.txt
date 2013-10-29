@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 2.8.9)
 project(RTThermometry)
 
 #-----------------------------------------------------------------------------
+set(EXTENSION_NAME RTThermometry)
 set(EXTENSION_HOMEPAGE "http://www.slicer.org/slicerWiki/index.php/Documentation/4.3/Extensions/RTThermometry")
 set(EXTENSION_CATEGORY "IGT")
 set(EXTENSION_CONTRIBUTORS "Laurent Chauvin (BWH)")

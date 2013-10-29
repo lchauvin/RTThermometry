@@ -34,8 +34,11 @@
 
 // SlicerQt includes
 #include "qSlicerAbstractModuleWidget.h"
-
 #include "qSlicerRTThermometryModuleExport.h"
+#include "qSlicerRTThermometryGraphWidget.h"
+
+// VTK includes
+#include <ctkVTKObject.h>
 
 class qSlicerRTThermometryModuleWidgetPrivate;
 class vtkMRMLNode;
@@ -45,6 +48,7 @@ class Q_SLICER_QTMODULES_RTTHERMOMETRY_EXPORT qSlicerRTThermometryModuleWidget :
   public qSlicerAbstractModuleWidget
 {
   Q_OBJECT
+  QVTK_OBJECT
 
 public:
 
@@ -65,6 +69,7 @@ public slots:
   void onMarkupNodeRemoved();
   void onSensorChanged(int row, int column);
   void onPhaseImageModified();
+  void onGraphHidden();
 
 protected:
   QScopedPointer<qSlicerRTThermometryModuleWidgetPrivate> d_ptr;
@@ -76,7 +81,7 @@ protected:
 			      vtkMRMLScalarVolumeNode* secondNode);
   void newImageAdded();
   void updateAllMarkups();
-  void saveMarkupsValues();
+  void updateTemperatureGraph(int position, Markup* sensor);
 
 private:
   Q_DECLARE_PRIVATE(qSlicerRTThermometryModuleWidget);

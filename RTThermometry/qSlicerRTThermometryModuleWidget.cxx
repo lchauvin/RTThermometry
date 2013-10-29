@@ -13,7 +13,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-==============================================================================*/
+  ==============================================================================*/
 
 // Qt includes
 #include <QDebug>
@@ -39,6 +39,9 @@ public:
   vtkMRMLSelectionNode* SelectionNode;
   vtkMRMLInteractionNode* InteractionNode;
 
+  qSlicerRTThermometryGraphWidget* TemperatureGraph;
+  int NumberOfImageReceived;
+
 public:
   qSlicerRTThermometryModuleWidgetPrivate();
   ~qSlicerRTThermometryModuleWidgetPrivate();
@@ -60,6 +63,9 @@ qSlicerRTThermometryModuleWidgetPrivate::qSlicerRTThermometryModuleWidgetPrivate
 
   this->SelectionNode = NULL;
   this->InteractionNode = NULL;
+
+  this->TemperatureGraph = NULL;
+  this->NumberOfImageReceived = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -95,6 +101,11 @@ qSlicerRTThermometryModuleWidgetPrivate::~qSlicerRTThermometryModuleWidgetPrivat
     {
     this->RASToIJK->Delete();
     }
+
+  if (this->TemperatureGraph)
+    {
+    delete this->TemperatureGraph;
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -103,7 +114,7 @@ qSlicerRTThermometryModuleWidgetPrivate::~qSlicerRTThermometryModuleWidgetPrivat
 //-----------------------------------------------------------------------------
 qSlicerRTThermometryModuleWidget::qSlicerRTThermometryModuleWidget(QWidget* _parent)
   : Superclass( _parent )
-  , d_ptr( new qSlicerRTThermometryModuleWidgetPrivate )
+    , d_ptr( new qSlicerRTThermometryModuleWidgetPrivate )
 {
 }
 
@@ -122,10 +133,10 @@ void qSlicerRTThermometryModuleWidget::setup()
 
   // Settings
   connect(d->ServerRadio, SIGNAL(toggled(bool)),
-	  this, SLOT(onServerRadioToggled(bool)));
+          this, SLOT(onServerRadioToggled(bool)));
 
   connect(d->ConnectButton, SIGNAL(clicked()),
-	  this, SLOT(onConnectClicked()));
+          this, SLOT(onConnectClicked()));
 
   // Sensors
   if (d->SensorTableWidget)
@@ -135,16 +146,16 @@ void qSlicerRTThermometryModuleWidget::setup()
     }
 
   connect(d->AddSensorButton, SIGNAL(toggled(bool)),
-	  this, SLOT(onAddSensorClicked(bool)));
+          this, SLOT(onAddSensorClicked(bool)));
 
   connect(d->RemoveSensorButton, SIGNAL(clicked()),
-	  this, SLOT(onRemoveSensorClicked()));
+          this, SLOT(onRemoveSensorClicked()));
 
   connect(d->ShowGraphCheckbox, SIGNAL(stateChanged(int)),
-	  this, SLOT(onShowGraphChanged(int)));
+          this, SLOT(onShowGraphChanged(int)));
 
   connect(d->SensorTableWidget, SIGNAL(cellChanged(int,int)),
-	  this, SLOT(onSensorChanged(int,int)));
+          this, SLOT(onSensorChanged(int,int)));
 
   // Time Player
 }
@@ -196,27 +207,27 @@ void qSlicerRTThermometryModuleWidget::onConnectClicked()
     displayNode->Delete();
 
     this->qvtkConnect(d->SensorList, vtkMRMLMarkupsNode::MarkupAddedEvent,
-		      this, SLOT(onMarkupNodeAdded()));
+                      this, SLOT(onMarkupNodeAdded()));
     this->qvtkConnect(d->SensorList, vtkMRMLMarkupsNode::PointModifiedEvent,
-		      this, SLOT(onMarkupNodeModified(vtkObject*, vtkObject*)));
+                      this, SLOT(onMarkupNodeModified(vtkObject*, vtkObject*)));
     this->qvtkConnect(d->SensorList, vtkMRMLMarkupsNode::NthMarkupModifiedEvent,
-		      this, SLOT(onMarkupNodeModified(vtkObject*, vtkObject*)));
+                      this, SLOT(onMarkupNodeModified(vtkObject*, vtkObject*)));
     this->qvtkConnect(d->SensorList, vtkMRMLMarkupsNode::MarkupRemovedEvent,
-		      this, SLOT(onMarkupNodeRemoved()));
+                      this, SLOT(onMarkupNodeRemoved()));
     }
-  
-  // Add OpenIGTLConnector node 
+
+  // Add OpenIGTLConnector node
   if (!d->IGTLConnector)
     {
     d->IGTLConnector = vtkMRMLIGTLConnectorNode::New();
     this->mrmlScene()->AddNode(d->IGTLConnector);
 
     this->qvtkConnect(d->IGTLConnector, vtkMRMLIGTLConnectorNode::ConnectedEvent,
-		      this, SLOT(onStatusConnected()));
+                      this, SLOT(onStatusConnected()));
     this->qvtkConnect(d->IGTLConnector, vtkMRMLIGTLConnectorNode::DisconnectedEvent,
-		      this, SLOT(onStatusDisconnected()));
+                      this, SLOT(onStatusDisconnected()));
     }
-  
+
   // Connect
   if (d->ServerRadio->isChecked())
     {
@@ -227,7 +238,7 @@ void qSlicerRTThermometryModuleWidget::onConnectClicked()
     {
     // Client type
     d->IGTLConnector->SetTypeClient(d->HostnameLine->text().toStdString(),
-				       d->PortLine->text().toDouble());
+                                    d->PortLine->text().toDouble());
     }
   d->IGTLConnector->Start();
   d->ConnectionFrame->setText("Connection - Waiting for connection...");
@@ -253,13 +264,13 @@ void qSlicerRTThermometryModuleWidget::onStatusConnected()
     if (imageConverter)
       {
       d->ReceivedPhaseImageNode =
-	vtkMRMLScalarVolumeNode::SafeDownCast(imageConverter->CreateNewNode(this->mrmlScene(), "ImagerClient"));
+        vtkMRMLScalarVolumeNode::SafeDownCast(imageConverter->CreateNewNode(this->mrmlScene(), "ImagerClient"));
       if (d->ReceivedPhaseImageNode)
-	{
-	d->IGTLConnector->RegisterIncomingMRMLNode(d->ReceivedPhaseImageNode);
-	this->qvtkConnect(d->ReceivedPhaseImageNode, vtkMRMLVolumeNode::ImageDataModifiedEvent,
-			  this, SLOT(onPhaseImageModified()));
-	}
+        {
+        d->IGTLConnector->RegisterIncomingMRMLNode(d->ReceivedPhaseImageNode);
+        this->qvtkConnect(d->ReceivedPhaseImageNode, vtkMRMLVolumeNode::ImageDataModifiedEvent,
+                          this, SLOT(onPhaseImageModified()));
+        }
       }
     }
 
@@ -268,7 +279,7 @@ void qSlicerRTThermometryModuleWidget::onStatusConnected()
     {
     d->RASToIJK = vtkMatrix4x4::New();
     }
-  
+
   d->ConnectionFrame->setText("Connection - Connected");
   d->IGTLConnector->RegisterIncomingMRMLNode(d->ReceivedPhaseImageNode);
 }
@@ -307,7 +318,7 @@ void qSlicerRTThermometryModuleWidget::onAddSensorClicked(bool pressed)
     {
     return;
     }
-  
+
   d->SelectionNode->SetReferenceActivePlaceNodeClassName(d->SensorList->GetClassName());
   d->SelectionNode->SetActivePlaceNodeID(d->SensorList->GetID());
 
@@ -351,8 +362,16 @@ void qSlicerRTThermometryModuleWidget::onRemoveSensorClicked()
 }
 
 //-----------------------------------------------------------------------------
-void qSlicerRTThermometryModuleWidget::onShowGraphChanged(int vtkNotUsed(state))
+void qSlicerRTThermometryModuleWidget::onShowGraphChanged(int state)
 {
+  Q_D(qSlicerRTThermometryModuleWidget);
+
+  if (!d->TemperatureGraph)
+    {
+    return;
+    }
+
+  d->TemperatureGraph->setVisible(state == Qt::Checked);
 }
 
 //-----------------------------------------------------------------------------
@@ -378,7 +397,7 @@ void qSlicerRTThermometryModuleWidget::onMarkupNodeAdded()
 
 //-----------------------------------------------------------------------------
 void qSlicerRTThermometryModuleWidget::onMarkupNodeModified(vtkObject* vtkNotUsed(caller),
-							    vtkObject* callData)
+                                                            vtkObject* callData)
 {
   Q_D(qSlicerRTThermometryModuleWidget);
 
@@ -459,21 +478,23 @@ void qSlicerRTThermometryModuleWidget::onSensorChanged(int row, int column)
 void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
 {
   Q_D(qSlicerRTThermometryModuleWidget);
-  
+
   if (!this->logic())
     {
     return;
     }
 
+  d->NumberOfImageReceived++;
+
   if (!d->PreviousPhaseImageNode)
     {
-    
+
     if (!d->ReceivedPhaseImageNode || !d->RASToIJK ||
-	!this->mrmlScene())
+        !this->mrmlScene())
       {
       return;
       }
-    
+
     // Initialize PreviousPhaseImageNode with data received
     vtkSmartPointer<vtkImageData> firstImageData = vtkSmartPointer<vtkImageData>::New();
     firstImageData->DeepCopy(d->ReceivedPhaseImageNode->GetImageData());
@@ -493,7 +514,7 @@ void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
       sumImageData->SetScalarType(firstImageData->GetScalarType());
       sumImageData->SetNumberOfScalarComponents(1);
       sumImageData->AllocateScalars();
-      
+
       d->SumPhaseDifference = vtkMRMLScalarVolumeNode::New();
       d->SumPhaseDifference->Copy(d->ReceivedPhaseImageNode);
       d->SumPhaseDifference->SetAndObserveImageData(sumImageData.GetPointer());
@@ -509,13 +530,13 @@ void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
 
       // Create color table
       vtkSmartPointer<vtkMRMLColorTableNode> colorTable =
-	vtkSmartPointer<vtkMRMLColorTableNode>::New();
+        vtkSmartPointer<vtkMRMLColorTableNode>::New();
       colorTable->SetName("RTThermometryColorMap");
       colorTable->SetTypeToUser();
       colorTable->SetNamesFromColors();
       colorTable->SetNumberOfColors(256);
-      
-      vtkLookupTable* lut = colorTable->GetLookupTable();  
+
+      vtkLookupTable* lut = colorTable->GetLookupTable();
       lut->SetHueRange(0.67, 0.0);
       lut->SetSaturationRange(1.0, 1.0);
       lut->SetValueRange(0.7, 1.0);
@@ -529,11 +550,20 @@ void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
 
       // Create display node
       vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode> displayNode =
-	vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode>::New();
+        vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode>::New();
       displayNode->SetAndObserveColorNodeID(colorTable->GetID());
       this->mrmlScene()->AddNode(displayNode.GetPointer());
 
       d->ViewerNode->SetAndObserveDisplayNodeID(displayNode->GetID());
+
+      // Initialize graph
+      if (!d->TemperatureGraph)
+        {
+        d->TemperatureGraph = new qSlicerRTThermometryGraphWidget();
+        d->TemperatureGraph->setVisible(false);
+        connect(d->TemperatureGraph, SIGNAL(graphHidden()),
+                this, SLOT(onGraphHidden()));
+        }
       }
 
     // Return to wait for next phase image
@@ -547,6 +577,20 @@ void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
     this->computePhaseDifference(d->PreviousPhaseImageNode, d->ReceivedPhaseImageNode);
     }
 }
+
+//-----------------------------------------------------------------------------
+void qSlicerRTThermometryModuleWidget::onGraphHidden()
+{
+  Q_D(qSlicerRTThermometryModuleWidget);
+  
+  if (!d->ShowGraphCheckbox)
+    {
+    return;
+    }
+
+  d->ShowGraphCheckbox->setChecked(false);
+}
+
 //-----------------------------------------------------------------------------
 void qSlicerRTThermometryModuleWidget::updateMarkupInWidget(Markup* modifiedMarkup)
 {
@@ -596,24 +640,25 @@ void qSlicerRTThermometryModuleWidget::updateMarkupInWidget(Markup* modifiedMark
     {
     // Get Markup position
     double mPos[4] = { modifiedMarkup->points[0].X(),
-		       modifiedMarkup->points[0].Y(),
-		       modifiedMarkup->points[0].Z(),
-		       1.0 };
+                       modifiedMarkup->points[0].Y(),
+                       modifiedMarkup->points[0].Z(),
+                       1.0 };
     double mIJKPos[4];
     d->RASToIJK->MultiplyPoint(mPos, mIJKPos);
 
-    vtkImageData* lastImage = 
+    vtkImageData* lastImage =
       d->ViewerNode->GetImageData();
     if (lastImage)
       {
       temp = lastImage->GetScalarComponentAsDouble(mIJKPos[0], mIJKPos[1], mIJKPos[2], 0);
       }
     }
-  d->SensorTableWidget->item(itemIndex, 2)->setText(QString::number(temp));
+  QString tempNumber = QString::number(temp,'f',1);
+  d->SensorTableWidget->item(itemIndex, 2)->setText(tempNumber);
 
   // Update name
   std::stringstream markupName;
-  markupName << modifiedMarkup->Description << " (" << temp << ")";
+  markupName << modifiedMarkup->Description << " (" << tempNumber.toStdString() << ")";
   modifiedMarkup->Label = markupName.str();
   d->SensorList->Modified();
   d->SensorTableWidget->item(itemIndex,1)->setText(modifiedMarkup->Description.c_str());
@@ -624,7 +669,7 @@ int qSlicerRTThermometryModuleWidget::
 getMarkupIndexByID(const char* markupID)
 {
   Q_D(qSlicerRTThermometryModuleWidget);
-  
+
   if (!d->SensorList)
     {
     return -1;
@@ -647,8 +692,6 @@ getMarkupIndexByID(const char* markupID)
 void qSlicerRTThermometryModuleWidget::
 computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNode* secondNode)
 {
-  clock_t start = clock();
-
   Q_D(qSlicerRTThermometryModuleWidget);
 
   if (!firstNode || !secondNode || !d->SumPhaseDifference)
@@ -660,7 +703,7 @@ computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNo
   vtkImageData* secondImData = secondNode->GetImageData();
   vtkImageData* sumPhaseDiff = d->SumPhaseDifference->GetImageData();
 
-  if (!firstImData || !secondImData || !sumPhaseDiff || 
+  if (!firstImData || !secondImData || !sumPhaseDiff ||
       firstImData == secondImData)
     {
     return;
@@ -686,7 +729,7 @@ computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNo
 
   int extent[6];
   sumPhaseDiff->GetExtent(extent);
-  
+
   vtkIdType inc[3];
   sumPhaseDiff->GetIncrements(inc);
 
@@ -695,29 +738,26 @@ computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNo
     for (int j=0; j<extent[3]+1; ++j)
       {
       for (int i=0; i<extent[1]+1; ++i)
-	{
-	// Compute phase difference
-	short phaseDiff = im2BufferPointer[k*inc[2]+j*inc[1]+i] - im1BufferPointer[k*inc[2]+j*inc[1]+i];
+        {
+        // Compute phase difference
+        short phaseDiff = im2BufferPointer[k*inc[2]+j*inc[1]+i] - im1BufferPointer[k*inc[2]+j*inc[1]+i];
 
-	// Sum the phase difference to get the total
-	sumPhaseDiffPointer[k*inc[2]+j*inc[1]+i] += phaseDiff;
+        // Sum the phase difference to get the total
+        sumPhaseDiffPointer[k*inc[2]+j*inc[1]+i] += phaseDiff;
 
-	// Compute temperature using total phase difference
-	double temp = 37.0 + (sumPhaseDiffPointer[k*inc[2]+j*inc[1]+i] * M_PI / 4096 / 2.0 / 0.010 / (2*M_PI*42.576) / 3.0 / 0.010);
+        // Compute temperature using total phase difference
+        double temp = 37.0 + (sumPhaseDiffPointer[k*inc[2]+j*inc[1]+i] * M_PI / 4096 / 2.0 / 0.010 / (2*M_PI*42.576) / 3.0 / 0.010);
 
-	// Set the temperature
-	outputBufferPointer[k*inc[2]+j*inc[1]+i] = temp;
+        // Set the temperature
+        outputBufferPointer[k*inc[2]+j*inc[1]+i] = temp;
 
-	// Copy value from im2 to im1 to save im2 data for next iteration
-	im1BufferPointer[k*inc[2]+j*inc[1]+i] = im2BufferPointer[k*inc[2]+j*inc[1]+i];
-	}
+        // Copy value from im2 to im1 to save im2 data for next iteration
+        im1BufferPointer[k*inc[2]+j*inc[1]+i] = im2BufferPointer[k*inc[2]+j*inc[1]+i];
+        }
       }
     }
   d->TemperatureImageList.push_back(newImData.GetPointer());
   this->newImageAdded();
-  
-  clock_t end = clock();
-  //std::cerr << "Time: " << (float)(end-start)/CLOCKS_PER_SEC << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -732,8 +772,6 @@ newImageAdded()
     }
 
   this->updateAllMarkups();
-
-  this->saveMarkupsValues();
 }
 
 //-----------------------------------------------------------------------------
@@ -746,24 +784,43 @@ updateAllMarkups()
     {
     return;
     }
- 
+
   int numberOfMarkups = d->SensorTableWidget->rowCount();
   for (int i = 0; i < numberOfMarkups; ++i)
     {
-    int n = this->getMarkupIndexByID(d->SensorTableWidget->item(i,0)->text().toStdString().c_str());
+    const char* sensorID = d->SensorTableWidget->item(i,0)->text().toStdString().c_str();
+    int n = this->getMarkupIndexByID(sensorID);
     if (n >= 0 && n < d->SensorList->GetNumberOfMarkups())
       {
       Markup* updateMarkup = d->SensorList->GetNthMarkup(n);
       if (updateMarkup)
-	{
-	this->updateMarkupInWidget(updateMarkup);
-	}
+        {
+        this->updateMarkupInWidget(updateMarkup);
+        this->updateTemperatureGraph(i, updateMarkup);
+        }
       }
     }
 }
 
 //-----------------------------------------------------------------------------
 void qSlicerRTThermometryModuleWidget::
-saveMarkupsValues()
+updateTemperatureGraph(int position, Markup* sensor)
 {
+  Q_D(qSlicerRTThermometryModuleWidget);
+
+  if (!sensor || !d->SensorTableWidget ||
+      !d->TemperatureGraph)
+    {
+    return;
+    }
+
+  if (position < 0 || position >= d->SensorTableWidget->rowCount())
+    {
+    return;
+    }
+
+  double temperature = d->SensorTableWidget->item(position,2)->text().toDouble();
+  std::string sensorID(d->SensorTableWidget->item(position,0)->text().toStdString());
+
+  d->TemperatureGraph->recordNewData(sensorID, sensor->Description, temperature, d->NumberOfImageReceived);
 }
