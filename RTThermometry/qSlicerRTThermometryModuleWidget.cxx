@@ -29,8 +29,9 @@ class qSlicerRTThermometryModuleWidgetPrivate: public Ui_qSlicerRTThermometryMod
 public:
   vtkMRMLIGTLConnectorNode* IGTLConnector;
   vtkMRMLMarkupsFiducialNode* SensorList;
-  vtkMRMLScalarVolumeNode* FirstPhaseImageNode;
-  vtkMRMLScalarVolumeNode* PhaseImageNode;
+  vtkMRMLScalarVolumeNode* PreviousPhaseImageNode;
+  vtkMRMLScalarVolumeNode* ReceivedPhaseImageNode;
+  vtkMRMLScalarVolumeNode* SumPhaseDifference;
   vtkMRMLScalarVolumeNode* ViewerNode;
   vtkMatrix4x4* RASToIJK;
   std::vector<vtkImageData*> TemperatureImageList;
@@ -51,8 +52,9 @@ qSlicerRTThermometryModuleWidgetPrivate::qSlicerRTThermometryModuleWidgetPrivate
 {
   this->IGTLConnector = NULL;
   this->SensorList = NULL;
-  this->FirstPhaseImageNode = NULL;
-  this->PhaseImageNode = NULL;
+  this->PreviousPhaseImageNode = NULL;
+  this->ReceivedPhaseImageNode = NULL;
+  this->SumPhaseDifference = NULL;
   this->ViewerNode = NULL;
   this->RASToIJK = NULL;
 
@@ -63,9 +65,9 @@ qSlicerRTThermometryModuleWidgetPrivate::qSlicerRTThermometryModuleWidgetPrivate
 //-----------------------------------------------------------------------------
 qSlicerRTThermometryModuleWidgetPrivate::~qSlicerRTThermometryModuleWidgetPrivate()
 {
-  if (this->PhaseImageNode && this->IGTLConnector)
+  if (this->ReceivedPhaseImageNode && this->IGTLConnector)
     {
-    this->IGTLConnector->UnregisterIncomingMRMLNode(this->PhaseImageNode);
+    this->IGTLConnector->UnregisterIncomingMRMLNode(this->ReceivedPhaseImageNode);
     this->IGTLConnector->Delete();
     }
 
@@ -74,9 +76,19 @@ qSlicerRTThermometryModuleWidgetPrivate::~qSlicerRTThermometryModuleWidgetPrivat
     this->SensorList->Delete();
     }
 
-  if (this->FirstPhaseImageNode)
+  if (this->PreviousPhaseImageNode)
     {
-    this->FirstPhaseImageNode->Delete();
+    this->PreviousPhaseImageNode->Delete();
+    }
+
+  if (this->SumPhaseDifference)
+    {
+    this->SumPhaseDifference->Delete();
+    }
+
+  if (this->ViewerNode)
+    {
+    this->ViewerNode->Delete();
     }
 
   if (this->RASToIJK)
@@ -236,26 +248,19 @@ void qSlicerRTThermometryModuleWidget::onStatusConnected()
   // Phase Image Node
   vtkSmartPointer<vtkIGTLToMRMLImage> imageConverter =
     vtkSmartPointer<vtkIGTLToMRMLImage>::New();
-  if (!d->PhaseImageNode)
+  if (!d->ReceivedPhaseImageNode)
     {
     if (imageConverter)
       {
-      d->PhaseImageNode =
+      d->ReceivedPhaseImageNode =
 	vtkMRMLScalarVolumeNode::SafeDownCast(imageConverter->CreateNewNode(this->mrmlScene(), "ImagerClient"));
-      if (d->PhaseImageNode)
+      if (d->ReceivedPhaseImageNode)
 	{
-	d->IGTLConnector->RegisterIncomingMRMLNode(d->PhaseImageNode);
-	this->qvtkConnect(d->PhaseImageNode, vtkMRMLVolumeNode::ImageDataModifiedEvent,
+	d->IGTLConnector->RegisterIncomingMRMLNode(d->ReceivedPhaseImageNode);
+	this->qvtkConnect(d->ReceivedPhaseImageNode, vtkMRMLVolumeNode::ImageDataModifiedEvent,
 			  this, SLOT(onPhaseImageModified()));
 	}
       }
-    }
-
-  // Viewer Node
-  if (!d->ViewerNode)
-    {
-    d->ViewerNode =
-      vtkMRMLScalarVolumeNode::SafeDownCast(imageConverter->CreateNewNode(this->mrmlScene(), "TemperatureViewer"));
     }
 
   // RAS To IJK Matrix
@@ -265,7 +270,7 @@ void qSlicerRTThermometryModuleWidget::onStatusConnected()
     }
   
   d->ConnectionFrame->setText("Connection - Connected");
-  d->IGTLConnector->RegisterIncomingMRMLNode(d->PhaseImageNode);
+  d->IGTLConnector->RegisterIncomingMRMLNode(d->ReceivedPhaseImageNode);
 }
 
 //-----------------------------------------------------------------------------
@@ -455,30 +460,91 @@ void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
 {
   Q_D(qSlicerRTThermometryModuleWidget);
   
-  if (!d->PhaseImageNode || !this->logic() || !d->RASToIJK ||
-      !d->ViewerNode)
+  if (!this->logic())
     {
     return;
     }
 
-  if (!d->FirstPhaseImageNode)
+  if (!d->PreviousPhaseImageNode)
     {
+    
+    if (!d->ReceivedPhaseImageNode || !d->RASToIJK ||
+	!this->mrmlScene())
+      {
+      return;
+      }
+    
+    // Initialize PreviousPhaseImageNode with data received
     vtkSmartPointer<vtkImageData> firstImageData = vtkSmartPointer<vtkImageData>::New();
-    d->FirstPhaseImageNode = vtkMRMLScalarVolumeNode::New();
-    d->FirstPhaseImageNode->Copy(d->PhaseImageNode);
-    firstImageData->DeepCopy(d->PhaseImageNode->GetImageData());
-    d->FirstPhaseImageNode->SetAndObserveImageData(firstImageData.GetPointer());
+    firstImageData->DeepCopy(d->ReceivedPhaseImageNode->GetImageData());
 
-    d->ViewerNode->Copy(d->PhaseImageNode);
+    d->PreviousPhaseImageNode = vtkMRMLScalarVolumeNode::New();
+    d->PreviousPhaseImageNode->Copy(d->ReceivedPhaseImageNode);
+    d->PreviousPhaseImageNode->SetAndObserveImageData(firstImageData.GetPointer());
+    d->PreviousPhaseImageNode->GetRASToIJKMatrix(d->RASToIJK);
+
+    // Initialize SumPhaseDifference node
+    if (!d->SumPhaseDifference)
+      {
+      vtkSmartPointer<vtkImageData> sumImageData = vtkSmartPointer<vtkImageData>::New();
+      sumImageData->SetDimensions(firstImageData->GetDimensions());
+      sumImageData->SetOrigin(firstImageData->GetOrigin());
+      sumImageData->SetSpacing(firstImageData->GetSpacing());
+      sumImageData->SetScalarType(firstImageData->GetScalarType());
+      sumImageData->SetNumberOfScalarComponents(1);
+      sumImageData->AllocateScalars();
+      
+      d->SumPhaseDifference = vtkMRMLScalarVolumeNode::New();
+      d->SumPhaseDifference->Copy(d->ReceivedPhaseImageNode);
+      d->SumPhaseDifference->SetAndObserveImageData(sumImageData.GetPointer());
+      }
+
+    // Initialize ViewerNode
+    if (!d->ViewerNode)
+      {
+      d->ViewerNode = vtkMRMLScalarVolumeNode::New();
+      d->ViewerNode->Copy(d->ReceivedPhaseImageNode);
+      d->ViewerNode->SetName("TemperatureViewer");
+      this->mrmlScene()->AddNode(d->ViewerNode);
+
+      // Create color table
+      vtkSmartPointer<vtkMRMLColorTableNode> colorTable =
+	vtkSmartPointer<vtkMRMLColorTableNode>::New();
+      colorTable->SetName("RTThermometryColorMap");
+      colorTable->SetTypeToUser();
+      colorTable->SetNamesFromColors();
+      colorTable->SetNumberOfColors(256);
+      
+      vtkLookupTable* lut = colorTable->GetLookupTable();  
+      lut->SetHueRange(0.67, 0.0);
+      lut->SetSaturationRange(1.0, 1.0);
+      lut->SetValueRange(0.7, 1.0);
+      lut->SetAlphaRange(0.8, 0.8);
+      lut->SetRampToLinear();
+      lut->SetScaleToLinear();
+      lut->SetTableRange(0.0, 255.0);
+      lut->Build();
+      lut->SetTableValue(0, 0.0, 0.0, 0.0, 0.0);
+      this->mrmlScene()->AddNode(colorTable.GetPointer());
+
+      // Create display node
+      vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode> displayNode =
+	vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode>::New();
+      displayNode->SetAndObserveColorNodeID(colorTable->GetID());
+      this->mrmlScene()->AddNode(displayNode.GetPointer());
+
+      d->ViewerNode->SetAndObserveDisplayNodeID(displayNode->GetID());
+      }
+
+    // Return to wait for next phase image
     return;
     }
-
-  d->PhaseImageNode->GetRASToIJKMatrix(d->RASToIJK);
 
   // Require at least 2 images to compute phase difference
-  if (d->FirstPhaseImageNode && d->PhaseImageNode)
+  if (d->PreviousPhaseImageNode && d->ReceivedPhaseImageNode)
     {
-    this->computePhaseDifference(d->FirstPhaseImageNode, d->PhaseImageNode);
+    // TODO: Move computePhaseDifference to logic
+    this->computePhaseDifference(d->PreviousPhaseImageNode, d->ReceivedPhaseImageNode);
     }
 }
 //-----------------------------------------------------------------------------
@@ -585,20 +651,16 @@ computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNo
 
   Q_D(qSlicerRTThermometryModuleWidget);
 
-  if (!firstNode || !secondNode)
+  if (!firstNode || !secondNode || !d->SumPhaseDifference)
     {
     return;
     }
 
   vtkImageData* firstImData = firstNode->GetImageData();
   vtkImageData* secondImData = secondNode->GetImageData();
+  vtkImageData* sumPhaseDiff = d->SumPhaseDifference->GetImageData();
 
-  if (d->TemperatureImageList.size() > 0)
-    {
-    firstImData = d->TemperatureImageList[d->TemperatureImageList.size()-1];
-    }
-
-  if (!firstImData || !secondImData ||
+  if (!firstImData || !secondImData || !sumPhaseDiff || 
       firstImData == secondImData)
     {
     return;
@@ -607,19 +669,26 @@ computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNo
   vtkSmartPointer<vtkImageData> newImData = vtkSmartPointer<vtkImageData>::New();
   newImData->SetDimensions(firstImData->GetDimensions());
   newImData->SetSpacing(firstImData->GetSpacing());
-  newImData->SetScalarType(firstImData->GetScalarType());
+  newImData->SetScalarTypeToDouble();
   newImData->SetNumberOfScalarComponents(1);
   newImData->AllocateScalars();
 
-  unsigned char* im1BufferPointer = (unsigned char*) firstImData->GetPointData()->GetScalars()->GetVoidPointer(0);
-  unsigned char* im2BufferPointer = (unsigned char*) secondImData->GetPointData()->GetScalars()->GetVoidPointer(0);
-  unsigned char* outputBufferPointer = (unsigned char*) newImData->GetPointData()->GetScalars()->GetVoidPointer(0);
+  short* im1BufferPointer = (short*) firstImData->GetPointData()->GetScalars()->GetVoidPointer(0);
+  short* im2BufferPointer = (short*) secondImData->GetPointData()->GetScalars()->GetVoidPointer(0);
+  short* sumPhaseDiffPointer = (short*) sumPhaseDiff->GetPointData()->GetScalars()->GetVoidPointer(0);
+  double* outputBufferPointer = (double*) newImData->GetPointData()->GetScalars()->GetVoidPointer(0);
+
+  if (!im1BufferPointer || !im2BufferPointer ||
+      !sumPhaseDiffPointer || !outputBufferPointer)
+    {
+    return;
+    }
 
   int extent[6];
-  newImData->GetExtent(extent);
+  sumPhaseDiff->GetExtent(extent);
   
   vtkIdType inc[3];
-  newImData->GetIncrements(inc);
+  sumPhaseDiff->GetIncrements(inc);
 
   for (int k=0; k<extent[5]+1; ++k)
     {
@@ -627,9 +696,20 @@ computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNo
       {
       for (int i=0; i<extent[1]+1; ++i)
 	{
-	unsigned char phaseDiff = im2BufferPointer[k*inc[2]+j*inc[1]+i] - im1BufferPointer[k*inc[2]+j*inc[1]+i];
-	unsigned char temp = phaseDiff;/*37.0 + (phaseDiff) * M_PI / 4096 / 2.0 / 0.010 / (2*M_PI*42.576) / 3.0 / 0.010);*/
+	// Compute phase difference
+	short phaseDiff = im2BufferPointer[k*inc[2]+j*inc[1]+i] - im1BufferPointer[k*inc[2]+j*inc[1]+i];
+
+	// Sum the phase difference to get the total
+	sumPhaseDiffPointer[k*inc[2]+j*inc[1]+i] += phaseDiff;
+
+	// Compute temperature using total phase difference
+	double temp = 37.0 + (sumPhaseDiffPointer[k*inc[2]+j*inc[1]+i] * M_PI / 4096 / 2.0 / 0.010 / (2*M_PI*42.576) / 3.0 / 0.010);
+
+	// Set the temperature
 	outputBufferPointer[k*inc[2]+j*inc[1]+i] = temp;
+
+	// Copy value from im2 to im1 to save im2 data for next iteration
+	im1BufferPointer[k*inc[2]+j*inc[1]+i] = im2BufferPointer[k*inc[2]+j*inc[1]+i];
 	}
       }
     }
@@ -637,7 +717,7 @@ computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, vtkMRMLScalarVolumeNo
   this->newImageAdded();
   
   clock_t end = clock();
-  std::cerr << "Time: " << (float)(end-start)/CLOCKS_PER_SEC << std::endl;
+  //std::cerr << "Time: " << (float)(end-start)/CLOCKS_PER_SEC << std::endl;
 }
 
 //-----------------------------------------------------------------------------
