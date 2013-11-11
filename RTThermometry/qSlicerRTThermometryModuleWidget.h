@@ -59,6 +59,7 @@ public:
 public slots:
   void onServerRadioToggled(bool checked);
   void onConnectClicked();
+  void onSetBaselineClicked();
   void onStatusConnected();
   void onStatusDisconnected();
   void onAddSensorClicked(bool pressed);
@@ -77,11 +78,11 @@ protected:
   virtual void setup();
   void updateMarkupInWidget(Markup* modifiedMarkup);
   int getMarkupIndexByID(const char* markupID);
-  void computePhaseDifference(vtkMRMLScalarVolumeNode* firstNode, 
-			      vtkMRMLScalarVolumeNode* secondNode);
+  void computePhaseDifference(vtkImageData* im1, vtkImageData* im2);
   void newImageAdded();
   void updateAllMarkups();
   void updateTemperatureGraph(int position, Markup* sensor);
+  void createViewerNode();
 
 private:
   Q_DECLARE_PRIVATE(qSlicerRTThermometryModuleWidget);
