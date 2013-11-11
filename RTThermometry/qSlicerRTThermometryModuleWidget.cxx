@@ -39,7 +39,7 @@ public:
   vtkMRMLScalarVolumeNode* OpenIGTLinkBuffer;
   vtkMRMLScalarVolumeNode* ViewerNode;
   std::vector<vtkImageData*> TemperatureImageList;
-  int NumberOfImageReceived;
+  int NumberOfMarkupSample;
   
   int    ImageDimension[3];
   double ImageOrigin[3];
@@ -78,7 +78,7 @@ qSlicerRTThermometryModuleWidgetPrivate::qSlicerRTThermometryModuleWidgetPrivate
   this->TotalPhaseDifference = NULL;
   this->OpenIGTLinkBuffer = NULL;
   this->ViewerNode = NULL;
-  this->NumberOfImageReceived = 0;
+  this->NumberOfMarkupSample = 0;
 
   this->ImageScalarType = VTK_SHORT;
   this->RASToIJK = vtkMatrix4x4::New();
@@ -390,7 +390,12 @@ void qSlicerRTThermometryModuleWidget::onSetBaselineClicked()
     }
   d->TemperatureImageList.clear();
   
-  d->NumberOfImageReceived = 0;
+  if (d->TemperatureGraph)
+    {
+    d->TemperatureGraph->clearData();
+    }
+
+  d->NumberOfMarkupSample = 0;
 
   this->qvtkConnect(d->OpenIGTLinkBuffer, vtkMRMLVolumeNode::ImageDataModifiedEvent,
 		    this, SLOT(onPhaseImageModified()));
@@ -596,7 +601,6 @@ void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
     return;
     }
 
-  d->NumberOfImageReceived++;
   vtkImageData* dataReceived = d->OpenIGTLinkBuffer->GetImageData();
 
   if (!d->Image1 && !d->TotalPhaseDifference)
@@ -823,6 +827,11 @@ newImageAdded()
 {
   Q_D(qSlicerRTThermometryModuleWidget);
 
+  if (d->SensorList && d->SensorList->GetNumberOfMarkups() > 0)
+    {
+    d->NumberOfMarkupSample++;
+    }
+
   if (d->ViewerNode)
     {
     vtkImageData* imData = d->TemperatureImageList[d->TemperatureImageList.size()-1];
@@ -882,7 +891,7 @@ updateTemperatureGraph(int position, Markup* sensor)
   double temperature = d->SensorTableWidget->item(position,2)->text().toDouble();
   std::string sensorID(d->SensorTableWidget->item(position,0)->text().toStdString());
 
-  d->TemperatureGraph->recordNewData(sensorID, sensor->Description, temperature, d->NumberOfImageReceived);
+  d->TemperatureGraph->recordNewData(sensorID, sensor->Description, temperature, d->NumberOfMarkupSample);
 }
 
 //-----------------------------------------------------------------------------

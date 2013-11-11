@@ -16,7 +16,7 @@
   This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc.
   and was partially funded by NIH grant 3P41RR013218-12S1
 
-==============================================================================*/
+  ==============================================================================*/
 
 // FooBar Widgets includes
 #include "qSlicerRTThermometryGraphWidget.h"
@@ -63,7 +63,7 @@ void qSlicerRTThermometryGraphWidgetPrivate
 qSlicerRTThermometryGraphWidget
 ::qSlicerRTThermometryGraphWidget(QWidget* parentWidget)
   : Superclass( parentWidget )
-  , d_ptr( new qSlicerRTThermometryGraphWidgetPrivate(*this) )
+    , d_ptr( new qSlicerRTThermometryGraphWidgetPrivate(*this) )
 {
   Q_D(qSlicerRTThermometryGraphWidget);
   d->setupUi(this);
@@ -134,14 +134,14 @@ void qSlicerRTThermometryGraphWidget
       newLine->SetInput(currentSensorTable, 0, 1);
       newLine->SetColor((array*76)%255, ((array+1)*76)%255, ((array+2)*76)%255);
       }
-    
+
     // Add new table to the map
     d->TemperatureMap.insert( std::pair<std::string, vtkTable*>(sensorID, currentSensorTable));
     }
   else
     {
     // Sensor table found
-    currentSensorTable = (*iter).second;    
+    currentSensorTable = (*iter).second;
     }
 
 
@@ -159,6 +159,32 @@ void qSlicerRTThermometryGraphWidget
     currentSensorTable->Modified();
     d->ChartView->chart()->RecalculateBounds();
     this->repaint();
+    }
+}
+
+//-----------------------------------------------------------------------------
+void qSlicerRTThermometryGraphWidget
+::clearData()
+{
+  Q_D(qSlicerRTThermometryGraphWidget);
+
+  qSlicerRTThermometryGraphWidgetPrivate::TemperatureMapIter iter
+    = d->TemperatureMap.begin();
+  while(iter != d->TemperatureMap.end())
+    {
+    vtkTable* resetTable = (*iter).second;
+    if (resetTable)
+      {
+      vtkDoubleArray* xAxis = (vtkDoubleArray*)(resetTable->GetColumn(0));
+      vtkDoubleArray* temperature = (vtkDoubleArray*)(resetTable->GetColumn(1));
+
+      if (xAxis && temperature)
+        {
+        xAxis->SetNumberOfValues(0);
+        temperature->SetNumberOfValues(0);
+        }
+      }
+    ++iter;
     }
 }
 

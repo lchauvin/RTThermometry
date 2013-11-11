@@ -51,6 +51,7 @@ public:
   virtual ~qSlicerRTThermometryGraphWidget();
 
   void recordNewData(std::string sensorID, std::string sensorName, double sensorValue, int imageNumber);
+  void clearData();
 
 protected slots:
 
