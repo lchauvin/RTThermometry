@@ -21,7 +21,9 @@
 // MRML includes
 
 // VTK includes
+#include <vtkIntArray.h>
 #include <vtkNew.h>
+#include <vtkObjectFactory.h>
 
 // STD includes
 #include <cassert>
