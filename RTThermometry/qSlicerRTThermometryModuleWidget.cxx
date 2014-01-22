@@ -917,21 +917,20 @@ void qSlicerRTThermometryModuleWidget::createViewerNode()
   colorTable->SetName("RTThermometryColorMap");
   colorTable->SetTypeToUser();
   colorTable->SetNamesFromColors();
-  colorTable->SetNumberOfColors(256);
+  colorTable->SetNumberOfColors(100);
   
-  double temperatureRange[2] = {25.0, 90.0};
+  double temperatureRange[2] = {0.0, 99.0};
   
   vtkLookupTable* lut = colorTable->GetLookupTable();
   lut->SetHueRange(0.67, 0.0);
   lut->SetSaturationRange(1.0, 1.0);
   lut->SetValueRange(0.7, 1.0);
   lut->SetAlphaRange(0.8, 0.8);
-  lut->SetRampToLinear();
-  lut->SetScaleToLinear();
+  //lut->SetRampToLinear();
+  //lut->SetScaleToLinear();
   lut->SetTableRange(temperatureRange[0], temperatureRange[1]);
   lut->Build();
   lut->SetTableValue(0, 0.0, 0.0, 0.0, 0.0);
-  lut->SetTableValue(255, 0.0, 0.0, 0.0, 0.0);
   this->mrmlScene()->AddNode(colorTable.GetPointer());
   
   // Create display node
@@ -939,6 +938,8 @@ void qSlicerRTThermometryModuleWidget::createViewerNode()
     vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode>::New();
   displayNode->SetAndObserveColorNodeID(colorTable->GetID());
   displayNode->AutoWindowLevelOff();
+  displayNode->ApplyThresholdOn();
+  displayNode->SetThreshold(0.0, 100.0);
   displayNode->SetLevel(temperatureRange[0] + (temperatureRange[1] - temperatureRange[0])/2);
   displayNode->SetWindow(temperatureRange[1] - temperatureRange[0]);
   this->mrmlScene()->AddNode(displayNode.GetPointer());
