@@ -17,6 +17,7 @@
 
 // Qt includes
 #include <QDebug>
+#include <vtkVersion.h>
 
 // SlicerQt includes
 #include "qSlicerRTThermometryModuleWidget.h"
@@ -618,9 +619,13 @@ void qSlicerRTThermometryModuleWidget::onPhaseImageModified()
     d->TotalPhaseDifference->SetDimensions(d->ImageDimension);
     d->TotalPhaseDifference->SetSpacing(d->ImageSpacing);
     d->TotalPhaseDifference->SetOrigin(d->ImageOrigin);
+#if VTK_MAJOR_VERSION <= 5
     d->TotalPhaseDifference->SetScalarType(d->ImageScalarType);
     d->TotalPhaseDifference->SetNumberOfScalarComponents(1);
     d->TotalPhaseDifference->AllocateScalars();
+#else
+    d->TotalPhaseDifference->AllocateScalars(d->ImageScalarType, 1);
+#endif
     memset(d->TotalPhaseDifference->GetScalarPointer(), 0x00, d->TotalPhaseDifference->GetActualMemorySize()*1024);
 
     this->createViewerNode();
@@ -702,9 +707,9 @@ void qSlicerRTThermometryModuleWidget::updateMarkupInWidget(Markup* modifiedMark
   if (d->TemperatureImageList.size() > 0)
     {
     // Get Markup position
-    double mPos[4] = { modifiedMarkup->points[0].X(),
-                       modifiedMarkup->points[0].Y(),
-                       modifiedMarkup->points[0].Z(),
+    double mPos[4] = { modifiedMarkup->points[0].GetX(),
+                       modifiedMarkup->points[0].GetY(),
+                       modifiedMarkup->points[0].GetZ(),
                        1.0 };
     double mIJKPos[4];
     d->RASToIJK->MultiplyPoint(mPos, mIJKPos);
@@ -770,9 +775,13 @@ computePhaseDifference(vtkImageData* im1, vtkImageData* im2)
   vtkImageData* newImData = vtkImageData::New();
   newImData->SetDimensions(d->ImageDimension);
   newImData->SetSpacing(1.0, 1.0, 1.0); // Not sure why spacing should be 1.0, 1.0, 1.0, but not fitting otherwise
+#if VTK_MAJOR_VERSION <= 5
   newImData->SetScalarTypeToDouble();
   newImData->SetNumberOfScalarComponents(1);
   newImData->AllocateScalars();
+#else
+  newImData->AllocateScalars(VTK_DOUBLE, 1);
+#endif
   memset(newImData->GetScalarPointer(), 0x00, newImData->GetActualMemorySize()*1024);
   d->TemperatureImageList.push_back(newImData);
 

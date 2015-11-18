@@ -19,6 +19,8 @@
   ==============================================================================*/
 
 // FooBar Widgets includes
+#include <vtkVersion.h>
+
 #include "qSlicerRTThermometryGraphWidget.h"
 #include "ui_qSlicerRTThermometryGraphWidget.h"
 
@@ -131,7 +133,11 @@ void qSlicerRTThermometryGraphWidget
     if (newLine)
       {
       int array = d->ChartView->chart()->GetNumberOfPlots();
+#if VTK_MAJOR_VERSION <= 5
       newLine->SetInput(currentSensorTable, 0, 1);
+#else
+      newLine->SetInputData(currentSensorTable, 0, 1);
+#endif
       newLine->SetColor((array*76)%255, ((array+1)*76)%255, ((array+2)*76)%255);
       }
 
